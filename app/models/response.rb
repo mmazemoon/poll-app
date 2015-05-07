@@ -12,6 +12,7 @@
 class Response < ActiveRecord::Base
   validates :user_id, :answer_id, presence: true
   validate :respondent_has_not_already_answered_question
+  validate :respondent_is_not_poll_author
 
   belongs_to(
     :respondent,
@@ -42,12 +43,18 @@ class Response < ActiveRecord::Base
       .where(":self_id IS NULL OR responses.id != :self_id", self_id: self.id)
   end
 
-  # private
+  private
 
   def respondent_has_not_already_answered_question
     # WHERE responses.user_id = #{self.user_id}
     if sibling_responses.exists?(user_id: self.user_id)
-      errors[:base] << "you already answered!"
+      errors[:base] << "you already answered this question!"
+    end
+  end
+
+  def respondent_is_not_poll_author
+    if self.answer_choice.question.poll.author_id == self.user_id
+      errors[:base] << "stop trying to rig the results!"
     end
   end
 
