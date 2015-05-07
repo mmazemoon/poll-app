@@ -11,6 +11,7 @@
 
 class Response < ActiveRecord::Base
   validates :user_id, :answer_id, presence: true
+  validate :respondent_has_not_already_answered_question
 
   belongs_to(
     :respondent,
@@ -33,10 +34,44 @@ class Response < ActiveRecord::Base
   )
 
   # all responses to a question (incl. itself)
+  # response, but not yet saved
 
   def sibling_responses
-    self.question.responses
+    self.question
+      .responses
+      .where(":self_id IS NULL OR responses.id != :self_id", self_id: self.id)
   end
 
+  # private
+
+  def respondent_has_not_already_answered_question
+    # WHERE responses.user_id = #{self.user_id}
+    if sibling_responses.exists?(user_id: self.user_id)
+      errors[:base] << "you already answered!"
+    end
+  end
 
 end
+
+
+
+
+
+
+# output for #sibling_responses
+# => Response::ActiveRecord_Associations_CollectionProxy
+
+# SELECT  "questions".* FROM "questions" INNER JOIN "answer_choices" ON "questions"."id" = "answer_choices"."question_id" WHERE "answer_choices"."id" = ? LIMIT 1  [["id", 8]]
+#   Response Load (0.1ms)  SELECT "responses".* FROM "responses" INNER JOIN "answer_choices" ON "responses"."answer_id" = "answer_choices"."id" WHERE "answer_choices"."question_id" = ?  [["question_id", 4]]
+# => [#<Response:0x007f92f68593b0
+#   id: 4,
+#   user_id: 2,
+#   answer_id: 7,
+#   created_at: Thu, 07 May 2015 18:54:38 UTC +00:00,
+#   updated_at: Thu, 07 May 2015 18:54:38 UTC +00:00>,
+#  #<Response:0x007f92f6859130
+#   id: 7,
+#   user_id: 4,
+#   answer_id: 8,
+#   created_at: Thu, 07 May 2015 18:59:41 UTC +00:00,
+#   updated_at: Thu, 07 May 2015 18:59:41 UTC +00:00>]
